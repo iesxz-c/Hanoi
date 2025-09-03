@@ -7,11 +7,9 @@ import {
   doc,
   runTransaction,
   updateDoc,
-  query,
-  where,
-  getDocs,
 } from "firebase/firestore";
 import { db, auth } from "../../firebaseConfig";
+import * as Network from "expo-network";
 
 export default function SeatsScreen() {
   const [seats, setSeats] = useState<any[]>([]);
@@ -23,8 +21,25 @@ export default function SeatsScreen() {
     return () => unsub();
   }, []);
 
+  // ✅ Check if connected to Wi-Fi (Expo restriction: can't get SSID)
+  const checkWifi = async () => {
+    try {
+      const state = await Network.getNetworkStateAsync();
+      return state.type === Network.NetworkStateType.WIFI;
+    } catch (e) {
+      console.log("Wi-Fi check failed:", e);
+      return false;
+    }
+  };
+
   // ✅ Safe booking with Firestore transaction
   const bookSeat = async (seatId: string) => {
+    const onWifi = await checkWifi();
+    if (!onWifi) {
+      Alert.alert("Error", "You must be connected to Wi-Fi to book a seat.");
+      return;
+    }
+
     const seatRef = doc(db, "seats", seatId);
 
     try {
@@ -41,19 +56,9 @@ export default function SeatsScreen() {
           throw new Error("Seat already taken!");
         }
 
-        // 🔒 Ensure user does not already have a seat
-        const q = query(
-          collection(db, "seats"),
-          where("userId", "==", auth.currentUser?.uid)
-        );
-        const existing = await getDocs(q);
-        if (!existing.empty) {
-          throw new Error("You already booked a seat!");
-        }
-
         transaction.update(seatRef, {
           status: "occupied",
-          userId: auth.currentUser?.uid,
+          userId: auth.currentUser?.uid ?? "unknown",
         });
       });
 
@@ -71,6 +76,25 @@ export default function SeatsScreen() {
       userId: null,
     });
   };
+
+  // ✅ Auto-release seat if Wi-Fi disconnected
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      const onWifi = await checkWifi();
+      if (!onWifi && auth.currentUser) {
+        const mySeat = seats.find((s) => s.userId === auth.currentUser?.uid);
+        if (mySeat) {
+          await releaseSeat(mySeat.id);
+          Alert.alert(
+            "Seat Released",
+            "You are no longer connected to Wi-Fi."
+          );
+        }
+      }
+    }, 5000); // check every 5 seconds
+
+    return () => clearInterval(interval);
+  }, [seats]);
 
   return (
     <View style={styles.container}>
