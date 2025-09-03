@@ -123,10 +123,11 @@ def detect():
 
     # Update Firestore seat doc
     seat_doc = {
-        "status": status,
-        "confidence": round(max_conf, 3),
-        "last_updated": firestore.SERVER_TIMESTAMP
-    }
+    "status": status,
+    "confidence": round(max_conf, 3),
+    "last_updated": firestore.SERVER_TIMESTAMP,
+    "number": int(seat_id.split("_")[1]) if "_" in seat_id else None
+}
     db.collection("seats").document(seat_id).set(seat_doc, merge=True)
 
     return jsonify({

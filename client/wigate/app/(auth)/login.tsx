@@ -30,7 +30,7 @@ export default function Login() {
         onChangeText={setPassword}
       />
       <Button title="Login" onPress={handleLogin} />
-      <Button title="Go to Signup" onPress={() => router.push("/auth/signup")} />
+      <Button title="Go to Signup" onPress={() => router.push("/(auth)/signup")} />
     </View>
   );
 }
