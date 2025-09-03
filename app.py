@@ -154,6 +154,10 @@ def list_seats():
     return jsonify({"seats": seats})
 
 
+@app.route('/ping', methods=['GET'])
+def ping():
+    return jsonify({"status": "ok", "message": "Connected to Library Wi-Fi"})
+
 def _latest_annotated_path():
     """
     Find the most recent file in runs/detect/predict* directories

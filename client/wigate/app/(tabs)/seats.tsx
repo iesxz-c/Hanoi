@@ -12,6 +12,7 @@ import { db, auth } from "../../firebaseConfig";
 import * as Network from "expo-network";
 
 export default function SeatsScreen() {
+  const BACKEND_URL = "http://192.168.1.7:5000"; // your laptop IP
   const [seats, setSeats] = useState<any[]>([]);
 
   useEffect(() => {
@@ -23,14 +24,20 @@ export default function SeatsScreen() {
 
   // ✅ Check if connected to Wi-Fi (Expo restriction: can't get SSID)
   const checkWifi = async () => {
-    try {
-      const state = await Network.getNetworkStateAsync();
-      return state.type === Network.NetworkStateType.WIFI;
-    } catch (e) {
-      console.log("Wi-Fi check failed:", e);
-      return false;
-    }
-  };
+  try {
+    // Step 1: Check if device is on Wi-Fi
+    const state = await Network.getNetworkStateAsync();
+    if (state.type !== Network.NetworkStateType.WIFI) return false;
+
+    // Step 2: Check if Wi-Fi is the library's (backend ping)
+    const res = await fetch(`${BACKEND_URL}/ping`);
+    const data = await res.json();
+    return data.status === "ok";
+  } catch (e) {
+    console.log("Wi-Fi check failed:", e);
+    return false;
+  }
+};
 
   // ✅ Safe booking with Firestore transaction
   const bookSeat = async (seatId: string) => {
