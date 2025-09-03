@@ -3,10 +3,23 @@ import { Button, Alert } from "react-native";
 import { auth } from "../../firebaseConfig";
 import { signOut } from "firebase/auth";
 import { useRouter } from "expo-router";
+//import { releaseUserSeat } from "../../utils/releaseUserSeat";
 
 export default function TabLayout() {
   const router = useRouter();
+    
 
+
+  // const handleLogout = async () => {
+//  const uid = auth.currentUser?.uid;
+// if (uid) {
+  //  await releaseUserSeat(uid); // ✅ free up their seat
+//  }
+//  await signOut(auth);
+//};
+
+
+  
   const handleSignOut = async () => {
     try {
       await signOut(auth);

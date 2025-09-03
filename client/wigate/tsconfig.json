@@ -2,10 +2,22 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
+
+    // This is the key change. We are upgrading from the deprecated 'node' (node10)
+    // to 'bundler'. This modern setting understands how new libraries like Firebase
+    // define their sub-modules, which will fix the "Cannot find module" error.
+    "moduleResolution": "bundler",
+    
+    // These options work alongside "bundler" to ensure smooth interoperability.
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+
+    // Your custom paths remain unchanged.
     "paths": {
       "@/*": [
         "./*"
-      ]
+      ],
+      "@firebase/auth": ["./node_modules/@firebase/auth/dist/index.rn.d.ts"]
     }
   },
   "include": [
@@ -15,3 +27,4 @@
     "expo-env.d.ts"
   ]
 }
+

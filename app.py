@@ -122,12 +122,16 @@ def detect():
         Image.open(annotated_path).save(os.path.join(RESULTS_DIR, result_filename))
 
     # Update Firestore seat doc
+    try:
+        number = int(seat_id.split("_")[1]) if "_" in seat_id else None
+    except (IndexError, ValueError):
+        number = None  # fallback if parsing fails
     seat_doc = {
-    "status": status,
-    "confidence": round(max_conf, 3),
-    "last_updated": firestore.SERVER_TIMESTAMP,
-    "number": int(seat_id.split("_")[1]) if "_" in seat_id else None
-}
+        "status": status,
+        "confidence": round(max_conf, 3),
+        "last_updated": firestore.SERVER_TIMESTAMP,
+        "number": number
+    }
     db.collection("seats").document(seat_id).set(seat_doc, merge=True)
 
     return jsonify({
