@@ -7,7 +7,7 @@ import { ActivityIndicator, View } from "react-native";
 export default function RootLayout() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
-
+  
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);

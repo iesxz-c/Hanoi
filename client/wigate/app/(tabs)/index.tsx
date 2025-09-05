@@ -14,19 +14,13 @@ export default function HomeScreen() {
   const quickActions = [
    
     {
-      id: 2,
-      title: 'My Bookings',
-      description: 'View your current reservations',
+      id: 1,
+      title: 'My Borrowings',
+      description: 'View your current borrowings',
       icon: 'calendar-outline',
       action: () => {},
     },
-    {
-      id: 3,
-      title: 'Find Workspace',
-      description: 'Discover nearby coworking spaces',
-      icon: 'location-outline',
-      action: () => {},
-    },
+    
   ];
 
   return (
@@ -59,19 +53,7 @@ export default function HomeScreen() {
           ))}
         </View>
 
-        <View style={styles.statsContainer}>
-          <Text style={styles.sectionTitle}>Your Stats</Text>
-          <View style={styles.statsRow}>
-            <View style={styles.statCard}>
-              <Text style={styles.statNumber}>12</Text>
-              <Text style={styles.statLabel}>Hours Booked</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statNumber}>5</Text>
-              <Text style={styles.statLabel}>Favorite Spots</Text>
-            </View>
-          </View>
-        </View>
+        
       </ScrollView>
     </SafeAreaView>
   );

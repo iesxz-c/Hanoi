@@ -19,7 +19,7 @@ export default function BooksScreen() {
         collection(db, "books"),
         orderBy("title"),
         startAfter(lastDoc),
-        limit(25)
+        limit(27)
       );
     }
     const snap = await getDocs(q);
