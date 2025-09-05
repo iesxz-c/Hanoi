@@ -31,9 +31,7 @@ export default function TabLayout() {
 
   return (
     <Tabs
-      screenOptions={{
-        headerRight: () => <Button title="Logout" onPress={handleSignOut} />,
-      }}
+      
     >
       <Tabs.Screen name="index" options={{ title: "Home" }} />
     </Tabs>

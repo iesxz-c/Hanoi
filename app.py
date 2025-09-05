@@ -170,6 +170,35 @@ def check_books():
     docs = db.collection("books").limit(5).stream()
     result = [d.to_dict() for d in docs]
     return jsonify(result)
+@app.route("/extract_categories", methods=["POST"])
+def extract_categories():
+    try:
+        # 1️⃣ Get all books
+        books_docs = db.collection("books").stream()
+
+        # 2️⃣ Extract unique categories
+        categories_set = set()
+        for doc in books_docs:
+            book = doc.to_dict()
+            if "categories" in book and book["categories"]:
+                # Handle multiple categories separated by ";" or ","
+                for cat in str(book["categories"]).split(";"):
+                    for subcat in cat.split(","):
+                        clean_cat = subcat.strip()
+                        if clean_cat:
+                            categories_set.add(clean_cat)
+
+        # 3️⃣ Write unique categories to 'categories' collection
+        batch = db.batch()
+        for cat in categories_set:
+            doc_ref = db.collection("categories").document(cat)
+            batch.set(doc_ref, {"name": cat})
+        batch.commit()
+
+        return jsonify({"status": "ok", "unique_categories_count": len(categories_set)})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/seats", methods=["GET"])

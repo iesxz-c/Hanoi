@@ -9,6 +9,7 @@ export default function BookDetails() {
   const [book, setBook] = useState<any>(null);
   const [isBorrowed, setIsBorrowed] = useState<false | "mine" | "other">(false);
   const [dueDate, setDueDate] = useState<Date | null>(null);
+  const [isOverdue, setIsOverdue] = useState(false);
 
   // Load book + borrow status
   useEffect(() => {
@@ -29,7 +30,15 @@ export default function BookDetails() {
         const borrow = snap.docs[0].data();
         if (borrow.userId === auth.currentUser?.uid) {
           setIsBorrowed("mine");
-          setDueDate(borrow.dueDate?.toDate ? borrow.dueDate.toDate() : null);
+
+          const due = borrow.dueDate?.toDate ? borrow.dueDate.toDate() : null;
+          setDueDate(due);
+
+          if (due && new Date() > due) {
+            setIsOverdue(true);
+          } else {
+            setIsOverdue(false);
+          }
         } else {
           setIsBorrowed("other");
         }
@@ -55,12 +64,15 @@ export default function BookDetails() {
       where("returnedAt", "==", null)
     );
     const userBorrowSnap = await getDocs(userBorrowQ);
-    if (!userBorrowSnap.empty) {
-      Alert.alert("Limit Reached", "You can only borrow one book at a time.");
-      return;
-    }
+    if (userBorrowSnap.size >= 3) {
+  Alert.alert(
+    "Limit Reached",
+    "You can only borrow a maximum of 3 books at a time."
+  );
+  return;
+}
 
-    // 🔹 Set due date (7 days from now)
+ 
     const borrowedAt = new Date();
     const due = new Date();
     due.setDate(borrowedAt.getDate() + 7);
@@ -75,6 +87,7 @@ export default function BookDetails() {
 
     setIsBorrowed("mine");
     setDueDate(due);
+    setIsOverdue(false);
     Alert.alert("Success", `You borrowed this book! Due on ${due.toDateString()}`);
   };
 
@@ -90,6 +103,7 @@ export default function BookDetails() {
       await updateDoc(snap.docs[0].ref, { returnedAt: new Date() });
       setIsBorrowed(false);
       setDueDate(null);
+      setIsOverdue(false);
       Alert.alert("Returned", "You returned this book.");
     }
   };
@@ -121,8 +135,10 @@ export default function BookDetails() {
 
       {isBorrowed === "mine" && dueDate ? (
         <View style={{ marginTop: 10 }}>
-          <Text style={{ color: "orange", marginBottom: 5 }}>
-            📅 Due Date: {dueDate.toDateString()}
+          <Text style={{ color: isOverdue ? "red" : "orange", marginBottom: 5 }}>
+            {isOverdue
+              ? `⚠️ Overdue! (was due on ${dueDate.toDateString()})`
+              : `📅 Due Date: ${dueDate.toDateString()}`}
           </Text>
           <Button title="Return Book" onPress={returnBook} color="red" />
         </View>

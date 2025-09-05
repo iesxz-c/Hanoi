@@ -1,161 +1,163 @@
-import React from 'react';
+import React, { useEffect, useState, useCallback } from "react";
 import {
-  View,
-  Text,
   StyleSheet,
-  TouchableOpacity,
   ScrollView,
   SafeAreaView,
-} from 'react-native';
-import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+  Text,
+  View,
+  Image,
+  FlatList,
+  TouchableOpacity,
+  RefreshControl,
+} from "react-native";
+import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
+import { db, auth } from "../../firebaseConfig";
+import { useRouter } from "expo-router";
 
 export default function HomeScreen() {
-  const quickActions = [
-   
-    {
-      id: 1,
-      title: 'My Borrowings',
-      description: 'View your current borrowings',
-      icon: 'calendar-outline',
-      action: () => {},
-    },
-    
-  ];
+  const [borrowedBooks, setBorrowedBooks] = useState<any[]>([]);
+  const [overdueBooks, setOverdueBooks] = useState<any[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const router = useRouter();
+  const fetchBorrowedBooks = async () => {
+    if (!auth.currentUser) return;
+
+    const q = query(
+      collection(db, "borrows"),
+      where("userId", "==", auth.currentUser.uid),
+      where("returnedAt", "==", null)
+    );
+    const snap = await getDocs(q);
+
+    const booksData: any[] = [];
+    const overdueData: any[] = [];
+
+    for (const docSnap of snap.docs) {
+      const borrow = docSnap.data();
+      const bookSnap = await getDoc(doc(db, "books", borrow.bookId));
+      if (bookSnap.exists()) {
+        const book = { id: bookSnap.id, ...bookSnap.data(), ...borrow };
+        booksData.push(book);
+
+        // Overdue check
+        const due = borrow.dueDate?.toDate ? borrow.dueDate.toDate() : null;
+        if (due && new Date() > due) {
+          overdueData.push(book);
+        }
+      }
+    }
+
+    setBorrowedBooks(booksData);
+    setOverdueBooks(overdueData);
+  };
+
+  useEffect(() => {
+    fetchBorrowedBooks();
+  }, []);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchBorrowedBooks();
+    setRefreshing(false);
+  }, []);
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView}>
-        <View style={styles.header}>
-          <Text style={styles.greeting}>Welcome back!</Text>
-          <Text style={styles.subtitle}>Find your perfect workspace</Text>
-        </View>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={{ padding: 15 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
+        {/* Borrowed Books Slider */}
+        <Text style={styles.sectionTitle}>📚 Your Borrowed Books</Text>
+        {borrowedBooks.length > 0 ? (
+          <FlatList
+            horizontal
+            data={borrowedBooks}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <TouchableOpacity style={styles.bookCard} onPress={() => router.push(`../book/${item.id}`)}>
+                <Image
+                  source={
+                    typeof item.thumbnail === "string"
+                      ? { uri: item.thumbnail }
+                      : require("../../assets/images/icon.png")
+                  }
+                  style={styles.thumbnail}
+                />
+                <Text numberOfLines={1} style={styles.bookTitle}>
+                  {item.title}
+                </Text>
+                {item.dueDate?.toDate && (
+                  <Text style={styles.dueText}>
+                    Due: {item.dueDate.toDate().toDateString()}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            )}
+          />
+        ) : (
+          <Text style={styles.emptyText}>You have no borrowed books.</Text>
+        )}
 
-        <View style={styles.quickActionsContainer}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
-          {quickActions.map((action) => (
-            <TouchableOpacity
-              key={action.id}
-              style={styles.actionCard}
-              onPress={action.action}
-            >
-              <View style={styles.actionIcon}>
-                <Ionicons name={action.icon as any} size={24} color="#667eea" />
-              </View>
-              <View style={styles.actionContent}>
-                <Text style={styles.actionTitle}>{action.title}</Text>
-                <Text style={styles.actionDescription}>
-                  {action.description}
+        {/* Overdue Books Section */}
+        <Text style={styles.sectionTitle}>⚠️ Overdue Books</Text>
+        {overdueBooks.length > 0 ? (
+          overdueBooks.map((book) => (
+            <View key={book.id} style={styles.overdueCard}>
+              <TouchableOpacity style={styles.bookCard} onPress={() => router.push(`../book/${book.id}`)}>
+              <Image
+                source={
+                  typeof book.thumbnail === "string"
+                    ? { uri: book.thumbnail }
+                    : require("../../assets/images/icon.png")
+                }
+                style={styles.thumbnailSmall}
+              /></TouchableOpacity>
+              <View style={{ flex: 1, marginLeft: 10 }}>
+                <Text style={styles.bookTitle}>{book.title}</Text>
+                <Text style={styles.overdueText}>
+                  Overdue since {book.dueDate.toDate().toDateString()}
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color="#ccc" />
-            </TouchableOpacity>
-          ))}
-        </View>
+            </View>
+          ))
+        ) : (
+          <Text style={styles.emptyText}>No overdue books 🎉</Text>
+        )}
 
-        
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8f9fa',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  header: {
-    padding: 20,
-    backgroundColor: 'white',
-    marginBottom: 20,
-  },
-  greeting: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 5,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-  },
-  quickActionsContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 30,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 15,
-  },
-  actionCard: {
-    backgroundColor: 'white',
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
+  container: { flex: 1, backgroundColor: "#f8f9fa" },
+  scrollView: { flex: 1 },
+  sectionTitle: { fontSize: 18, fontWeight: "bold", marginVertical: 10 },
+  emptyText: { fontSize: 14, color: "gray", marginBottom: 10 },
+  bookCard: {
+    width: 120,
+    marginRight: 10,
+    padding: 5,
+    backgroundColor: "#fff",
+    borderRadius: 8,
+    alignItems: "center",
     elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
   },
-  actionIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#f0f2ff',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 15,
+  thumbnail: { width: 80, height: 120, borderRadius: 5 },
+  bookTitle: { fontSize: 14, fontWeight: "600", marginTop: 5, textAlign: "center" },
+  dueText: { fontSize: 12, color: "orange", marginTop: 2 },
+  overdueCard: {
+    flexDirection: "row",
+    backgroundColor: "#ffe5e5",
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 10,
+    alignItems: "center",
   },
-  actionContent: {
-    flex: 1,
-  },
-  actionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 4,
-  },
-  actionDescription: {
-    fontSize: 14,
-    color: '#666',
-  },
-  statsContainer: {
-    paddingHorizontal: 20,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  statCard: {
-    backgroundColor: 'white',
-    padding: 20,
-    borderRadius: 12,
-    alignItems: 'center',
-    flex: 1,
-    marginHorizontal: 6,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#667eea',
-    marginBottom: 5,
-  },
-  statLabel: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-  },
+  thumbnailSmall: { width: 50, height: 70, borderRadius: 5 },
+  overdueText: { fontSize: 13, color: "red", marginTop: 2 },
 });
