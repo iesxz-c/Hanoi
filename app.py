@@ -2,6 +2,7 @@ import os
 import uuid
 from datetime import datetime
 from io import BytesIO
+import pandas as pd
 
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
@@ -141,6 +142,34 @@ def detect():
         "boxes": boxes_out,
         "annotated_url": f"/results/{result_filename}" if result_filename else None
     })
+
+@app.route("/upload_books", methods=["POST"])
+def upload_books():
+    try:
+        file_path = request.args.get("file", "books.csv")
+        df = pd.read_csv(file_path)
+
+        batch = db.batch()
+        count = 0
+        for _, row in df.iterrows():
+            doc_ref = db.collection("books").document(str(row["isbn13"]))
+            batch.set(doc_ref, row.to_dict())
+            count += 1
+            if count % 500 == 0:  # Firestore batch write limit
+                batch.commit()
+                batch = db.batch()
+        if count % 500 != 0:
+            batch.commit()
+
+        return jsonify({"status": "ok", "uploaded": count})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+@app.route("/check_books", methods=["GET"])
+def check_books():
+    docs = db.collection("books").limit(5).stream()
+    result = [d.to_dict() for d in docs]
+    return jsonify(result)
 
 
 @app.route("/seats", methods=["GET"])
