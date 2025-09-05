@@ -10,7 +10,7 @@ import {
   TouchableOpacity,
   RefreshControl,
 } from "react-native";
-import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, getDoc, limit } from "firebase/firestore";
 import { db, auth } from "../../firebaseConfig";
 import { useRouter } from "expo-router";
 
@@ -18,7 +18,22 @@ export default function HomeScreen() {
   const [borrowedBooks, setBorrowedBooks] = useState<any[]>([]);
   const [overdueBooks, setOverdueBooks] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const [recommendations, setRecommendations] = useState<any[]>([]);
+
   const router = useRouter();
+
+  // Fetch current user
+  useEffect(() => {
+    const fetchUser = async () => {
+      if (!auth.currentUser) return;
+      const userSnap = await getDoc(doc(db, "users", auth.currentUser.uid));
+      if (userSnap.exists()) setUser(userSnap.data());
+    };
+    fetchUser();
+  }, []);
+
+  // Fetch borrowed and overdue books
   const fetchBorrowedBooks = async () => {
     if (!auth.currentUser) return;
 
@@ -39,11 +54,8 @@ export default function HomeScreen() {
         const book = { id: bookSnap.id, ...bookSnap.data(), ...borrow };
         booksData.push(book);
 
-        // Overdue check
         const due = borrow.dueDate?.toDate ? borrow.dueDate.toDate() : null;
-        if (due && new Date() > due) {
-          overdueData.push(book);
-        }
+        if (due && new Date() > due) overdueData.push(book);
       }
     }
 
@@ -61,6 +73,36 @@ export default function HomeScreen() {
     setRefreshing(false);
   }, []);
 
+  // Fetch recommendations based on interests
+  useEffect(() => {
+    const fetchRecommendations = async () => {
+      if (!user?.interests || user.interests.length === 0) return;
+
+      let allRecs: any[] = [];
+
+      for (const cat of user.interests) {
+        const q = query(
+          collection(db, "books"),
+          where("categories", "==", cat),
+          limit(3)
+        );
+        const snap = await getDocs(q);
+        snap.forEach((doc) => allRecs.push({ id: doc.id, ...doc.data() }));
+      }
+
+      allRecs = allRecs.sort(() => 0.5 - Math.random()).slice(0, 20);
+      setRecommendations(allRecs);
+    };
+
+    fetchRecommendations();
+  }, [user]);
+
+  // Helper to safely get thumbnail
+  const getThumbnail = (item: any) =>
+    typeof item.thumbnail === "string" && item.thumbnail
+      ? { uri: item.thumbnail }
+      : require("../../assets/images/icon.png");
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
@@ -70,7 +112,7 @@ export default function HomeScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        {/* Borrowed Books Slider */}
+        {/* Borrowed Books */}
         <Text style={styles.sectionTitle}>📚 Your Borrowed Books</Text>
         {borrowedBooks.length > 0 ? (
           <FlatList
@@ -78,15 +120,11 @@ export default function HomeScreen() {
             data={borrowedBooks}
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
-              <TouchableOpacity style={styles.bookCard} onPress={() => router.push(`../book/${item.id}`)}>
-                <Image
-                  source={
-                    typeof item.thumbnail === "string"
-                      ? { uri: item.thumbnail }
-                      : require("../../assets/images/icon.png")
-                  }
-                  style={styles.thumbnail}
-                />
+              <TouchableOpacity
+                style={styles.bookCard}
+                onPress={() => router.push(`../book/${item.id}`)}
+              >
+                <Image source={getThumbnail(item)} style={styles.thumbnail} />
                 <Text numberOfLines={1} style={styles.bookTitle}>
                   {item.title}
                 </Text>
@@ -102,20 +140,17 @@ export default function HomeScreen() {
           <Text style={styles.emptyText}>You have no borrowed books.</Text>
         )}
 
-        {/* Overdue Books Section */}
+        {/* Overdue Books */}
         <Text style={styles.sectionTitle}>⚠️ Overdue Books</Text>
         {overdueBooks.length > 0 ? (
           overdueBooks.map((book) => (
             <View key={book.id} style={styles.overdueCard}>
-              <TouchableOpacity style={styles.bookCard} onPress={() => router.push(`../book/${book.id}`)}>
-              <Image
-                source={
-                  typeof book.thumbnail === "string"
-                    ? { uri: book.thumbnail }
-                    : require("../../assets/images/icon.png")
-                }
-                style={styles.thumbnailSmall}
-              /></TouchableOpacity>
+              <TouchableOpacity
+                style={styles.bookCard}
+                onPress={() => router.push(`../book/${book.id}`)}
+              >
+                <Image source={getThumbnail(book)} style={styles.thumbnailSmall} />
+              </TouchableOpacity>
               <View style={{ flex: 1, marginLeft: 10 }}>
                 <Text style={styles.bookTitle}>{book.title}</Text>
                 <Text style={styles.overdueText}>
@@ -128,6 +163,31 @@ export default function HomeScreen() {
           <Text style={styles.emptyText}>No overdue books 🎉</Text>
         )}
 
+        {/* Recommendations */}
+        <Text style={styles.sectionTitle}>✨ Recommended Books</Text>
+        {recommendations.length > 0 ? (
+          <FlatList
+            horizontal
+            data={recommendations}
+            keyExtractor={(item) => item.id}
+            showsHorizontalScrollIndicator={false}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.bookCard}
+                onPress={() => router.push(`../book/${item.id}`)}
+              >
+                <Image source={getThumbnail(item)} style={styles.thumbnail} />
+                <Text numberOfLines={2} style={styles.bookTitle}>
+                  {item.title}
+                </Text>
+              </TouchableOpacity>
+            )}
+          />
+        ) : (
+          <Text style={styles.emptyText}>
+            No recommendations yet. Add interests in your profile!
+          </Text>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
